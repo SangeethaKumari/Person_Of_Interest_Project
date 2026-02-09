@@ -17,7 +17,7 @@ app = FastAPI(title="POI Search API - Final Cloud Mode")
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
-MODEL_ID = "openai/clip-vit-base-patch32"
+MODEL_ID = "sentence-transformers/clip-ViT-B-32"
 
 # Mount static files
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -65,37 +65,31 @@ def get_hf_embeddings(inputs, is_image=False):
     if not HF_TOKEN:
         raise HTTPException(status_code=500, detail="HF_TOKEN missing in environment")
     
-    # Use the official v1 embeddings endpoint (most stable)
-    API_URL = "https://router.huggingface.co/hf-inference/v1/embeddings"
+    # Use the stable Standard Inference API endpoint
+    API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     
     try:
+        # Standard format for Inference API: {"inputs": ...}
         if is_image:
-            # For images we use the task-specific endpoint
-            IMAGE_URL = f"https://router.huggingface.co/hf-inference/models/{MODEL_ID}"
-            response = requests.post(IMAGE_URL, headers=headers, data=inputs)
+            response = requests.post(API_URL, headers=headers, data=inputs)
         else:
-            # Use OpenAI compatible format for text
-            response = requests.post(API_URL, headers=headers, json={
-                "model": MODEL_ID,
-                "input": inputs
-            })
+            response = requests.post(API_URL, headers=headers, json={"inputs": inputs})
             
         if response.status_code != 200:
             print(f"HF Error Status: {response.status_code}")
             print(f"HF Error Text: {response.text}")
-            raise HTTPException(status_code=500, detail="AI Engine is busy/denied. Please check HF_TOKEN permissions.")
+            raise HTTPException(status_code=500, detail=f"AI Engine Error (Status {response.status_code}). Check HF Token permissions.")
             
         data = response.json()
         
-        # Parse based on endpoint format
-        if "data" in data: # OpenAI format
-            return data["data"][0]["embedding"]
-        elif isinstance(data, list):
-            return data[0] if isinstance(data[0], list) else data
+        # Standard API returns a list of embeddings
+        if isinstance(data, list):
+            return data
         return data
         
     except Exception as e:
+        print(f"Inference Exception: {e}")
         raise HTTPException(status_code=500, detail=f"Inference Error: {str(e)}")
 
 @app.get("/")
