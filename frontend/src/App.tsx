@@ -34,22 +34,29 @@ export default function App() {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'text' | 'image'>('text');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleTextSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query) return;
 
     setLoading(true);
+    setError(null);
     try {
       const allResults: ModelResults = {};
       await Promise.all(MODELS.map(async (model) => {
         const response = await axios.post(`${API_BASE_URL}/search/text?query=${encodeURIComponent(query)}&model_type=${model.id}`);
         allResults[model.id] = response.data.results;
+
+        if (response.data.results.length === 0 && response.data.message) {
+          setError(response.data.message);
+        }
       }));
       setResults(allResults);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Error searching. Make sure the backend is running at Render URL or localhost:8000');
+      const msg = err.response?.data?.detail || 'Error searching. Please check your connection.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -170,7 +177,19 @@ export default function App() {
 
         {/* Results Grid */}
         <AnimatePresence mode="wait">
-          {results && (
+          {error && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="p-12 text-center glass-morphism rounded-3xl border-red-500/20"
+            >
+              <Info className="mx-auto mb-4 text-red-400" size={48} />
+              <h3 className="text-xl font-bold text-white mb-2">Search Notice</h3>
+              <p className="text-slate-400">{error}</p>
+            </motion.div>
+          )}
+
+          {results && !error && (
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}

@@ -175,33 +175,29 @@ name = "backend"
 version = "0.1.0"
 source = { virtual = "backend" }
 dependencies = [
+    { name = "better-profanity" },
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pillow" },
-    { name = "pyarrow" },
     { name = "python-multipart" },
     { name = "qdrant-client" },
-    { name = "scikit-learn" },
     { name = "sentence-transformers" },
     { name = "torch" },
-    { name = "transformers" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "better-profanity", specifier = ">=0.7.0" },
     { name = "fastapi", specifier = ">=0.128.5" },
     { name = "numpy", specifier = ">=2.3.3" },
     { name = "pandas", specifier = ">=2.3.3" },
     { name = "pillow", specifier = ">=11.3.0" },
-    { name = "pyarrow", specifier = ">=21.0.0" },
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "qdrant-client", specifier = ">=1.16.2" },
-    { name = "scikit-learn", specifier = ">=1.7.2" },
-    { name = "sentence-transformers", specifier = ">=5.1.1" },
-    { name = "torch", specifier = ">=2.8.0" },
-    { name = "transformers", specifier = "<4.57.0" },
+    { name = "sentence-transformers", specifier = ">=3.3.0" },
+    { name = "torch", specifier = ">=2.5.0" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
 
@@ -230,6 +226,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/77/e9/df2358efd7659577435e2177bfa69cba6c33216681af51a707193dec162a/beautifulsoup4-4.14.2.tar.gz", hash = "sha256:2a98ab9f944a11acee9cc848508ec28d9228abfd522ef0fad6a02a72e0ded69e", size = 625822, upload-time = "2025-09-29T10:05:42.613Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/94/fe/3aed5d0be4d404d12d36ab97e2f1791424d9ca39c2f754a6285d59a3b01d/beautifulsoup4-4.14.2-py3-none-any.whl", hash = "sha256:5ef6fa3a8cbece8488d66985560f97ed091e22bbc4e9c2338508a9d5de6d4515", size = 106392, upload-time = "2025-09-29T10:05:43.771Z" },
+]
+
+[[package]]
+name = "better-profanity"
+version = "0.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/4a/52966c1c883819f0b48540312a4a7f63b5c49f4e5b1a10838ae7f06ebb3c/better_profanity-0.7.0.tar.gz", hash = "sha256:8a6fdc8606d7471e7b5f6801917eca98ec211098262e82f62da4f5de3a73145b", size = 29977, upload-time = "2020-11-02T10:49:57.54Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/dd/0b074d89e903cc771721cde2c4bf3d8c9d114b5bd791af5c62bcf5fb9459/better_profanity-0.7.0-py3-none-any.whl", hash = "sha256:bd4c529ea6aa2db1aaa50524be1ed14d0fe5c664f1fd88c8bc388c7e9f9f00e8", size = 46104, upload-time = "2020-11-02T10:49:56.066Z" },
 ]
 
 [[package]]
