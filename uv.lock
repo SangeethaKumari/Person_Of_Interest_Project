@@ -178,12 +178,10 @@ dependencies = [
     { name = "better-profanity" },
     { name = "fastapi" },
     { name = "numpy" },
-    { name = "pandas" },
     { name = "pillow" },
     { name = "python-multipart" },
     { name = "qdrant-client" },
-    { name = "sentence-transformers" },
-    { name = "torch" },
+    { name = "requests" },
     { name = "uvicorn" },
 ]
 
@@ -192,12 +190,10 @@ requires-dist = [
     { name = "better-profanity", specifier = ">=0.7.0" },
     { name = "fastapi", specifier = ">=0.128.5" },
     { name = "numpy", specifier = ">=2.3.3" },
-    { name = "pandas", specifier = ">=2.3.3" },
     { name = "pillow", specifier = ">=11.3.0" },
     { name = "python-multipart", specifier = ">=0.0.22" },
     { name = "qdrant-client", specifier = ">=1.16.2" },
-    { name = "sentence-transformers", specifier = ">=3.3.0" },
-    { name = "torch", specifier = ">=2.5.0" },
+    { name = "requests", specifier = ">=2.32.3" },
     { name = "uvicorn", specifier = ">=0.40.0" },
 ]
 

@@ -1,29 +1,23 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sentence_transformers import SentenceTransformer
 import numpy as np
-import pandas as pd
-from PIL import Image
-import io
 import os
+import requests
 from pathlib import Path
-import torch
 from fastapi.staticfiles import StaticFiles
 from qdrant_client import QdrantClient
 from better_profanity import profanity
 
-# Load default profanity words
+# Safety filters
 profanity.load_censor_words()
 
-# Optimization: Force PyTorch to use 1 thread to save RAM
-torch.set_num_threads(1)
-
-app = FastAPI(title="POI Search API - Balanced Mode")
+app = FastAPI(title="POI Search API - Final Cloud Mode")
 
 # Configuration
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-MODEL_ID = "clip-ViT-B-32" # The most efficient CLIP model
+HF_TOKEN = os.getenv("HF_TOKEN")
+MODEL_ID = "openai/clip-vit-base-patch32"
 
 # Mount static files
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -37,166 +31,113 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global clients
+# Global client
 qdrant_client = None
-model = None
 
 @app.on_event("startup")
 async def startup_event():
-    global qdrant_client, model
-    
-    # 1. Connect to Qdrant
+    global qdrant_client
     if QDRANT_URL:
         try:
             qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
             print("📡 Connected to Qdrant Cloud")
         except Exception as e:
-            print(f"⚠️ Qdrant Error: {e}")
-
-    # 2. Load Model Locally (Optimized for RAM)
-    try:
-        print(f"📥 Loading {MODEL_ID} locally...")
-        model = SentenceTransformer(MODEL_ID, device="cpu")
-        print("✅ Model Loaded Successfully")
-    except Exception as e:
-        print(f"❌ Model Load Error: {e}")
+            print(f"❌ Qdrant Error: {e}")
 
 def validate_query(text: str):
-    """Enhanced validation for search queries to catch keyboard mashing."""
     text = text.strip()
-    if not text:
-        return False, "Query cannot be empty"
+    if not text or len(text) < 3:
+        return False, "Query too short or empty"
+    if profanity.contains_profanity(text):
+        return False, "Query contains inappropriate language"
     
-    if len(text) < 3:
-        return False, "Query is too short (min 3 chars)"
-    
-    if text.isdigit():
-        return False, "Query cannot be just numbers"
-
-    # 1. Repetitive character check (e.g., "aaaaa")
-    for char in set(text):
-        if text.count(char) > 7 and char != ' ':
-            return False, "Query contains too many repetitive characters"
-
-    # 2. Word length check (e.g., "asdfghjklqwertyuiop")
-    words = text.split()
-    for word in words:
-        if len(word) > 18:
-            return False, "One of your words is unnaturally long"
-
-    # 3. Vowel/Consonant Ratio (Keyboard mash check)
+    # Gibberish check
     vowels = set("aeiouAEIOU")
     v_count = sum(1 for c in text if c in vowels)
     alpha_count = sum(1 for c in text if c.isalpha())
-    
-    if alpha_count > 0:
-        v_ratio = v_count / alpha_count
-        # Natural languages usually have > 30% vowels. 
-        if alpha_count > 6 and v_ratio < 0.25:
-            return False, "Query looks like gibberish (low vowel ratio)"
-            
-        # Character diversity check (catch sadcasdasdasdas)
-        unique_chars = len(set(text.lower().replace(" ", "")))
-        if alpha_count > 8 and unique_chars / alpha_count < 0.45:
-            return False, "Query uses too few unique characters (likely gibberish)"
-
-        if alpha_count / len(text) < 0.4:
-            return False, "Query contains too many non-alphabetic characters"
-    
-    # 4. Toxicity/Profanity Check
-    if profanity.contains_profanity(text):
-        return False, "Query contains inappropriate language"
+    if alpha_count > 6 and (v_count / alpha_count) < 0.20:
+        return False, "Query looks like gibberish"
         
     return True, text
 
+def get_hf_embeddings(inputs, is_image=False):
+    """The 'Proxy' method: Offload math to HF to save 100% of Render RAM."""
+    if not HF_TOKEN:
+        raise HTTPException(status_code=500, detail="HF_TOKEN missing in environment")
+    
+    # Use the official v1 embeddings endpoint (most stable)
+    API_URL = "https://router.huggingface.co/hf-inference/v1/embeddings"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    
+    try:
+        if is_image:
+            # For images we use the task-specific endpoint
+            IMAGE_URL = f"https://router.huggingface.co/hf-inference/models/{MODEL_ID}"
+            response = requests.post(IMAGE_URL, headers=headers, data=inputs)
+        else:
+            # Use OpenAI compatible format for text
+            response = requests.post(API_URL, headers=headers, json={
+                "model": MODEL_ID,
+                "input": inputs
+            })
+            
+        if response.status_code != 200:
+            print(f"HF Error Status: {response.status_code}")
+            print(f"HF Error Text: {response.text}")
+            raise HTTPException(status_code=500, detail="AI Engine is busy/denied. Please check HF_TOKEN permissions.")
+            
+        data = response.json()
+        
+        # Parse based on endpoint format
+        if "data" in data: # OpenAI format
+            return data["data"][0]["embedding"]
+        elif isinstance(data, list):
+            return data[0] if isinstance(data[0], list) else data
+        return data
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference Error: {str(e)}")
+
 @app.get("/")
 async def root():
-    return {
-        "status": "Online", 
-        "mode": "Local Optimized", 
-        "qdrant": qdrant_client is not None,
-        "model_loaded": model is not None
-    }
+    return {"status": "Online", "mode": "Zero-RAM Cloud Proxy", "qdrant": qdrant_client is not None}
 
 @app.post("/search/text")
 async def search_text(query: str, model_type: str = "base_clip", top_k: int = 5):
-    if not model or not qdrant_client:
-        raise HTTPException(status_code=500, detail="Server not fully initialized")
-    
-    is_valid, validated_query = validate_query(query)
+    is_valid, v_query = validate_query(query)
     if not is_valid:
-        raise HTTPException(status_code=400, detail=validated_query)
+        raise HTTPException(status_code=400, detail=v_query)
 
-    # Encode locally
-    qv = model.encode(validated_query, convert_to_numpy=True).tolist()
+    v_math = get_hf_embeddings(v_query)
     
     try:
-        # Use query_search or simply search based on updated qdrant-client
         hits = qdrant_client.query_points(
             collection_name="poi_base_clip",
-            query=qv,
+            query=v_math,
             limit=top_k
         ).points
         
-        # Filter results by a minimum similarity threshold (e.g. 0.28 raw score)
-        # This prevents showing random people for weird inputs
         MIN_SCORE = 0.28
-        valid_hits = [h for h in hits if h.score >= MIN_SCORE]
-
-        if not valid_hits:
-            return {
-                "query": validated_query,
-                "results": [],
-                "message": "No confident matches found. Try described features like 'blonde hair' or 'wearing glasses'."
-            }
-
-        return {
-            "query": validated_query, 
-            "results": [
-                {
-                    "path": h.payload.get("path"), 
-                    "score": min(0.99, (h.score * 2.5) + 0.1),
-                    "raw_score": h.score
-                } for h in valid_hits
-            ]
-        }
+        results = [
+            {
+                "path": h.payload.get("path"), 
+                "score": min(0.99, (h.score * 2.5) + 0.1),
+                "raw_score": h.score
+            } for h in hits if h.score >= MIN_SCORE
+        ]
+        return {"query": v_query, "results": results}
     except Exception as e:
-        # Fallback to older search method if query_points fails
-        try:
-            hits = qdrant_client.search(
-                collection_name="poi_base_clip",
-                query_vector=qv,
-                limit=top_k
-            )
-            return {
-                "query": query, 
-                "results": [
-                    {
-                        "path": h.payload.get("path"), 
-                        "score": min(0.99, (h.score * 2.5) + 0.1),
-                        "raw_score": h.score
-                    } for h in hits
-                ]
-            }
-        except Exception as e2:
-            print(f"❌ Qdrant Query Error: {e2}")
-            raise HTTPException(status_code=500, detail=str(e2))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/search/image")
 async def search_image(file: UploadFile = File(...), model_type: str = "base_clip", top_k: int = 5):
-    if not model or not qdrant_client:
-        raise HTTPException(status_code=500, detail="Server not fully initialized")
-    
     contents = await file.read()
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
-    
-    # Encode locally
-    qv = model.encode(image, convert_to_numpy=True).tolist()
+    v_math = get_hf_embeddings(contents, is_image=True)
     
     try:
         hits = qdrant_client.query_points(
             collection_name="poi_base_clip",
-            query=qv,
+            query=v_math,
             limit=top_k
         ).points
         
@@ -210,23 +151,4 @@ async def search_image(file: UploadFile = File(...), model_type: str = "base_cli
             ]
         }
     except Exception as e:
-        # Fallback to older search method
-        try:
-            hits = qdrant_client.search(
-                collection_name="poi_base_clip",
-                query_vector=qv,
-                limit=top_k
-            )
-            # handle hit scoring logic below...
-        except Exception as e2:
-             raise HTTPException(status_code=500, detail=str(e2))
-
-        return {
-            "results": [
-                {
-                    "path": h.payload.get("path"), 
-                    "score": min(0.99, (h.score * 1.5)),
-                    "raw_score": h.score
-                } for h in hits
-            ]
-        }
+        raise HTTPException(status_code=500, detail=str(e))
