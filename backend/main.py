@@ -11,13 +11,43 @@ from better_profanity import profanity
 # Safety filters
 profanity.load_censor_words()
 
-app = FastAPI(title="POI Search API - Final Cloud Mode")
+app = FastAPI(title="POI Search API - Smart Hybrid Mode")
 
 # Configuration
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
 MODEL_ID = "sentence-transformers/clip-ViT-B-32"
+
+# Detection: Are we on Render or Local Mac?
+IS_RENDER = os.getenv("RENDER") is not None
+
+# Global clients
+qdrant_client = None
+local_model = None
+
+@app.on_event("startup")
+async def startup_event():
+    global qdrant_client, local_model
+    
+    # 1. Database Connection
+    if QDRANT_URL:
+        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        print("📡 Connected to Qdrant Cloud")
+
+    # 2. Intelligence Selection
+    if not IS_RENDER:
+        try:
+            from sentence_transformers import SentenceTransformer
+            import torch
+            torch.set_num_threads(1)
+            print(f"📥 [LOCAL MODE] Loading {MODEL_ID}...")
+            local_model = SentenceTransformer(MODEL_ID, device="cpu")
+            print("✅ Local Model Ready")
+        except Exception as e:
+            print(f"⚠️ Local Model failed, falling back to Cloud: {e}")
+    else:
+        print("☁️ [RENDER MODE] Using Zero-RAM Cloud Proxy")
 
 # Mount static files
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -31,86 +61,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global client
-qdrant_client = None
-
-@app.on_event("startup")
-async def startup_event():
-    global qdrant_client
-    if QDRANT_URL:
-        try:
-            qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-            print("📡 Connected to Qdrant Cloud")
-        except Exception as e:
-            print(f"❌ Qdrant Error: {e}")
-
-def validate_query(text: str):
-    text = text.strip()
-    if not text or len(text) < 3:
-        return False, "Query too short or empty"
-    if profanity.contains_profanity(text):
-        return False, "Query contains inappropriate language"
+def get_embeddings(inputs, is_image=False):
+    """Smart Hybrid: Uses Local if available, else Cloud."""
+    if local_model:
+        # Use your Mac's power
+        return local_model.encode(inputs, convert_to_numpy=True).tolist()
     
-    # Gibberish check
-    vowels = set("aeiouAEIOU")
-    v_count = sum(1 for c in text if c in vowels)
-    alpha_count = sum(1 for c in text if c.isalpha())
-    if alpha_count > 6 and (v_count / alpha_count) < 0.20:
-        return False, "Query looks like gibberish"
-        
-    return True, text
-
-def get_hf_embeddings(inputs, is_image=False):
-    """The 'Proxy' method: Offload math to HF to save 100% of Render RAM."""
+    # Fallback to Cloud (Zero RAM for Render)
     if not HF_TOKEN:
-        raise HTTPException(status_code=500, detail="HF_TOKEN missing in environment")
+        raise HTTPException(status_code=500, detail="HF_TOKEN missing")
     
-    # Use the stable Standard Inference API endpoint
-    API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    # Use the 2026 Router with explicit task mapping
+    API_URL = f"https://router.huggingface.co/hf-inference/models/{MODEL_ID}"
+    headers = {
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "X-Wait-For-Model": "true"  # Crucial: forces HF to load the model if it's cold
+    }
     
     try:
-        # Standard format for Inference API: {"inputs": ...}
         if is_image:
             response = requests.post(API_URL, headers=headers, data=inputs)
         else:
             response = requests.post(API_URL, headers=headers, json={"inputs": inputs})
             
         if response.status_code != 200:
-            print(f"HF Error Status: {response.status_code}")
-            print(f"HF Error Text: {response.text}")
-            raise HTTPException(status_code=500, detail=f"AI Engine Error (Status {response.status_code}). Check HF Token permissions.")
+            print(f"HF Error: {response.status_code} - {response.text}")
+            msg = "AI Service Busy (Loading...)" if response.status_code == 503 else "AI Access Denied"
+            raise HTTPException(status_code=500, detail=f"{msg}. Status: {response.status_code}")
             
         data = response.json()
-        
-        # Standard API returns a list of embeddings
-        if isinstance(data, list):
-            return data
-        return data
-        
+        return data[0] if isinstance(data, list) and isinstance(data[0], list) else data
     except Exception as e:
-        print(f"Inference Exception: {e}")
-        raise HTTPException(status_code=500, detail=f"Inference Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
 async def root():
     return {
         "status": "Online", 
-        "mode": "Zero-RAM Cloud Proxy", 
-        "env_check": {
-            "hf_token_present": HF_TOKEN is not None and len(str(HF_TOKEN)) > 5,
-            "qdrant_url_present": QDRANT_URL is not None,
-            "qdrant_api_key_present": QDRANT_API_KEY is not None
-        }
+        "mode": "Hybrid", 
+        "engine": "Local" if local_model else "Cloud Proxy",
+        "render_detected": IS_RENDER
     }
 
 @app.post("/search/text")
 async def search_text(query: str, model_type: str = "base_clip", top_k: int = 5):
-    is_valid, v_query = validate_query(query)
-    if not is_valid:
-        raise HTTPException(status_code=400, detail=v_query)
+    if profanity.contains_profanity(query):
+        raise HTTPException(status_code=400, detail="Inappropriate language")
 
-    v_math = get_hf_embeddings(v_query)
+    v_math = get_embeddings(query)
     
     try:
         hits = qdrant_client.query_points(
@@ -119,22 +117,31 @@ async def search_text(query: str, model_type: str = "base_clip", top_k: int = 5)
             limit=top_k
         ).points
         
-        MIN_SCORE = 0.28
-        results = [
-            {
-                "path": h.payload.get("path"), 
-                "score": min(0.99, (h.score * 2.5) + 0.1),
-                "raw_score": h.score
-            } for h in hits if h.score >= MIN_SCORE
-        ]
-        return {"query": v_query, "results": results}
+        return {
+            "query": query, 
+            "results": [
+                {
+                    "path": h.payload.get("path"), 
+                    "score": min(0.99, (h.score * 2.5) + 0.1),
+                    "raw_score": h.score
+                } for h in hits if h.score >= 0.22
+            ]
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/search/image")
 async def search_image(file: UploadFile = File(...), model_type: str = "base_clip", top_k: int = 5):
     contents = await file.read()
-    v_math = get_hf_embeddings(contents, is_image=True)
+    
+    # Check if we should process image locally or cloud
+    if local_model:
+        from PIL import Image
+        import io
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        v_math = local_model.encode(image, convert_to_numpy=True).tolist()
+    else:
+        v_math = get_embeddings(contents, is_image=True)
     
     try:
         hits = qdrant_client.query_points(
@@ -142,7 +149,6 @@ async def search_image(file: UploadFile = File(...), model_type: str = "base_cli
             query=v_math,
             limit=top_k
         ).points
-        
         return {
             "results": [
                 {

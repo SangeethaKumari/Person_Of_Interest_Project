@@ -13,4 +13,6 @@ dependencies = [
     "requests>=2.32.3",
     "better-profanity>=0.7.0",
     "uvicorn>=0.40.0",
+    "sentence-transformers>=5.1.1",
+    "torch>=2.8.0",
 ]
