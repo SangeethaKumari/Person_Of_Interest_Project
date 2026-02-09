@@ -91,10 +91,15 @@ def validate_query(text: str):
     
     if alpha_count > 0:
         v_ratio = v_count / alpha_count
-        # Natural languages usually have > 20% vowels. Gibberish often has < 15%
-        if alpha_count > 6 and v_ratio < 0.15:
-            return False, "Query looks like a keyboard mash (no vowels)"
+        # Natural languages usually have > 30% vowels. 
+        if alpha_count > 6 and v_ratio < 0.25:
+            return False, "Query looks like gibberish (low vowel ratio)"
             
+        # Character diversity check (catch sadcasdasdasdas)
+        unique_chars = len(set(text.lower().replace(" ", "")))
+        if alpha_count > 8 and unique_chars / alpha_count < 0.45:
+            return False, "Query uses too few unique characters (likely gibberish)"
+
         if alpha_count / len(text) < 0.4:
             return False, "Query contains too many non-alphabetic characters"
     
@@ -133,9 +138,9 @@ async def search_text(query: str, model_type: str = "base_clip", top_k: int = 5)
             limit=top_k
         ).points
         
-        # Filter results by a minimum similarity threshold (e.g. 0.22 raw score)
+        # Filter results by a minimum similarity threshold (e.g. 0.28 raw score)
         # This prevents showing random people for weird inputs
-        MIN_SCORE = 0.22
+        MIN_SCORE = 0.28
         valid_hits = [h for h in hits if h.score >= MIN_SCORE]
 
         if not valid_hits:
