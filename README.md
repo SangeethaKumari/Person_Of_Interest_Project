@@ -32,7 +32,7 @@ The project has been upgraded to a modern **Client-Server Architecture**, design
 4. Set the **Root Directory** to `backend`.
 5. The build and start commands will be automatically detected if you use the provided `render.yaml` blueprint, or set them manually:
    - Build Command: `pip install -r requirements.txt`
-   - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - Start Command: `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`
 6. Add Environment Variables:
    - `QDRANT_URL`: Your Qdrant cluster URL.
    - `QDRANT_API_KEY`: Your Qdrant API key.
