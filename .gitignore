@@ -8,6 +8,15 @@
 __pycache__/
 *.py[cod]
 *$py.class
+# System & Logs
+.DS_Store
+logs
+*.log
+
+# Dependencies & Build
+node_modules/
+dist/
+dist-ssr/
 .venv/
 .pytest_cache/
 
