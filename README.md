@@ -28,18 +28,21 @@ The project has been upgraded to a modern **Client-Server Architecture**, design
 ### 2. Backend (Render)
 1. Connect your GitHub repository to [Render.com](https://render.com/).
 2. Create a new **Web Service**.
-3. Set the Build Command: `pip install -r requirements.txt` (or use the provided `pyproject.toml`).
-4. Set the Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`.
-5. Add Environment Variables:
+3. **CRITICAL**: Because this app runs heavy AI models (CLIP-L, SigLIP), you **must** select a plan with at least **2GB-4GB of RAM** (Starter or Pro). The "Free" tier will crash.
+4. Set the **Root Directory** to `backend`.
+5. The build and start commands will be automatically detected if you use the provided `render.yaml` blueprint, or set them manually:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+6. Add Environment Variables:
    - `QDRANT_URL`: Your Qdrant cluster URL.
    - `QDRANT_API_KEY`: Your Qdrant API key.
 
 ### 3. Frontend (Vercel)
 1. Import your repository into [Vercel](https://vercel.com/).
-2. Set the Framework Preset to **Vite**.
-3. Set the Root Directory to `frontend`.
+2. Set the **Root Directory** to `frontend`.
+3. Set the Framework Preset to **Vite**.
 4. Add Environment Variables:
-   - `VITE_API_URL`: The URL of your Render backend.
+   - `VITE_API_URL`: The URL of your Render backend (e.g., `https://poi-backend.onrender.com`).
 
 ---
 
