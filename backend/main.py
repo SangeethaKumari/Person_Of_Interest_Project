@@ -100,7 +100,15 @@ def get_hf_embeddings(inputs, is_image=False):
 
 @app.get("/")
 async def root():
-    return {"status": "Online", "mode": "Zero-RAM Cloud Proxy", "qdrant": qdrant_client is not None}
+    return {
+        "status": "Online", 
+        "mode": "Zero-RAM Cloud Proxy", 
+        "env_check": {
+            "hf_token_present": HF_TOKEN is not None and len(str(HF_TOKEN)) > 5,
+            "qdrant_url_present": QDRANT_URL is not None,
+            "qdrant_api_key_present": QDRANT_API_KEY is not None
+        }
+    }
 
 @app.post("/search/text")
 async def search_text(query: str, model_type: str = "base_clip", top_k: int = 5):
