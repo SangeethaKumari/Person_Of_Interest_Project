@@ -1,0 +1,21 @@
+# Environment files
+.env
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.pytest_cache/
+
+# Streamlit
+.streamlit/
+
+# Project Specific Data (Large Files)
+data/*.npy
+data/*.parquet
+docs/images/celebA/
+
+# OS specific
+.DS_Store
