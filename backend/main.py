@@ -33,34 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Render "Lite Mode" - Only load the lightest model to fit in 512MB RAM
 MODELS_CONFIG = {
     "base_clip": "clip-ViT-B-32",
-    "enhanced_clip_l": "clip-ViT-L-14",
-    "siglip2": "google/siglip2-base-patch16-224"
+    # "enhanced_clip_l": "clip-ViT-L-14",  # Disabled for Render Free Tier (900MB RAM)
+    # "siglip2": "google/siglip2-base-patch16-224" # Disabled for Render Free Tier (800MB RAM)
 }
-
-class Siglip2Encoder:
-    def __init__(self, model_id):
-        self.model = AutoModel.from_pretrained(model_id)
-        self.processor = AutoProcessor.from_pretrained(model_id)
-        self.device = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
-        self.model.to(self.device)
-        self.model.eval()
-
-    def encode(self, data, normalize_embeddings=True):
-        is_text = isinstance(data, str)
-        if is_text:
-            inputs = self.processor(text=data, padding="max_length", return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                features = self.model.get_text_features(**inputs)
-        else:
-            inputs = self.processor(images=data, return_tensors="pt").to(self.device)
-            with torch.no_grad():
-                features = self.model.get_image_features(**inputs)
-        
-        if normalize_embeddings:
-            features = torch.nn.functional.normalize(features, p=2, dim=1)
-        return features.cpu().numpy()
 
 # Initialize Qdrant client if URL is provided
 qdrant_client = None
@@ -82,7 +60,7 @@ META_PATH = DATA_DIR / "index_meta.parquet"
 @app.on_event("startup")
 async def startup_event():
     global meta_data
-    print("🚀 Starting POI API...")
+    print("🚀 Starting POI API in LITE MODE...")
     
     # Load metadata
     if META_PATH.exists():
@@ -93,20 +71,10 @@ async def startup_event():
     for key, model_id in MODELS_CONFIG.items():
         print(f"📥 Loading {key}...")
         try:
-            if "siglip" in model_id.lower():
-                models[key] = Siglip2Encoder(model_id)
-            else:
-                models[key] = SentenceTransformer(model_id)
+            models[key] = SentenceTransformer(model_id)
             
             # Load local embeddings as fallback
-            vec_path = DATA_DIR / f"index_vectors_{key.lower().replace('_', '-') if 'clip_l' in key else key}.npy"
-            # Adjustment for naming inconsistency in my script
-            if key == "enhanced_clip_l":
-                vec_path = DATA_DIR / "index_vectors_enhanced_clip-l.npy"
-            elif key == "siglip2":
-                vec_path = DATA_DIR / "index_vectors_siglip_2.npy"
-            elif key == "base_clip":
-                vec_path = DATA_DIR / "index_vectors_base_clip.npy"
+            vec_path = DATA_DIR / "index_vectors_base_clip.npy"
 
             if vec_path.exists():
                 local_embeddings[key] = np.load(vec_path)
@@ -116,12 +84,13 @@ async def startup_event():
 
 @app.get("/")
 async def root():
-    return {"message": "POI Search API is running", "models": list(MODELS_CONFIG.keys()), "qdrant": qdrant_client is not None}
+    return {"message": "POI Search API is running in LITE MODE", "models": list(MODELS_CONFIG.keys()), "qdrant": qdrant_client is not None}
 
 @app.post("/search/text")
-async def search_text(query: str, model_type: str = "enhanced_clip_l", top_k: int = 5):
+async def search_text(query: str, model_type: str = "base_clip", top_k: int = 5):
     if model_type not in models:
-        raise HTTPException(status_code=400, detail="Invalid model type")
+        # Fallback to the first available model if requested one is disabled
+        model_type = list(MODELS_CONFIG.keys())[0]
     
     model = models[model_type]
     qv = model.encode(query).reshape(1, -1).flatten().tolist()
@@ -139,7 +108,7 @@ async def search_text(query: str, model_type: str = "enhanced_clip_l", top_k: in
                 "results": [
                     {
                         "path": h.payload.get("path"), 
-                        "score": min(0.99, (h.score * 2.5) + 0.1) if "clip" in model_type else h.score,
+                        "score": min(0.99, (h.score * 2.5) + 0.1),
                         "raw_score": h.score
                     } for h in hits
                 ]
@@ -160,16 +129,17 @@ async def search_text(query: str, model_type: str = "enhanced_clip_l", top_k: in
         "results": [
             {
                 "path": meta_data.loc[idx, "path"] if meta_data is not None else f"index_{idx}",
-                "score": min(0.99, (float(sims[idx]) * 2.5) + 0.1) if "clip" in model_type else float(sims[idx]),
+                "score": min(0.99, (float(sims[idx]) * 2.5) + 0.1),
                 "raw_score": float(sims[idx])
             } for idx in top_indices
         ]
     }
 
 @app.post("/search/image")
-async def search_image(file: UploadFile = File(...), model_type: str = "enhanced_clip_l", top_k: int = 5):
+async def search_image(file: UploadFile = File(...), model_type: str = "base_clip", top_k: int = 5):
     if model_type not in models:
-        raise HTTPException(status_code=400, detail="Invalid model type")
+        # Fallback to the first available model if requested one is disabled
+        model_type = list(MODELS_CONFIG.keys())[0]
     
     model = models[model_type]
     contents = await file.read()

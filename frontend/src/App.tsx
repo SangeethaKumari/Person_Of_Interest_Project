@@ -22,10 +22,9 @@ interface ModelResults {
   [key: string]: SearchResult[];
 }
 
+// Lite Mode configuration to match backend RAM constraints
 const MODELS = [
-  { id: 'base_clip', name: 'Base CLIP', desc: 'ViT-B-32 (Fast)' },
-  { id: 'enhanced_clip_l', name: 'Enhanced CLIP-L', desc: 'ViT-L-14 (Accurate)' },
-  { id: 'siglip2', name: 'SigLIP 2', desc: 'Google (Advanced)' }
+  { id: 'base_clip', name: 'AI Search Engine', desc: 'CLIP ViT-B-32 (Fast & Efficient)' },
 ];
 
 export default function App() {
@@ -50,7 +49,7 @@ export default function App() {
       setResults(allResults);
     } catch (err) {
       console.error(err);
-      alert('Error searching. Make sure the backend is running at :8000');
+      alert('Error searching. Make sure the backend is running at Render URL or localhost:8000');
     } finally {
       setLoading(false);
     }
@@ -99,7 +98,7 @@ export default function App() {
           </h1>
         </motion.div>
         <p className="text-slate-400 max-w-2xl mx-auto text-lg">
-          An advanced AI-powered person retrieval system using CLIP and SigLIP 2.
+          An advanced AI-powered person retrieval system.
           Discover your celebrity doppelgänger or search via natural language.
         </p>
       </header>
@@ -170,18 +169,19 @@ export default function App() {
         </div>
 
         {/* Results Grid */}
-        <AnimatePresence>
+        <AnimatePresence mode="wait">
           {results && (
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center"
             >
               {MODELS.map((model) => (
-                <div key={model.id} className="space-y-6">
+                <div key={model.id} className="space-y-6 md:col-start-1 md:col-span-2 lg:col-start-1 lg:col-span-3">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
                     <div>
-                      <h3 className="text-xl font-bold">{model.name}</h3>
+                      <h3 className="text-xl font-bold">{model.name} Match Results</h3>
                       <p className="text-sm text-slate-500">{model.desc}</p>
                     </div>
                     <div className="bg-slate-800 p-2 rounded-lg">
@@ -189,43 +189,37 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {results[model.id]?.map((res, i) => (
                       <motion.div
                         key={res.path}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: i * 0.1 }}
-                        className="group flex gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all hover:-translate-y-1"
+                        className="group flex flex-col gap-4 p-6 rounded-3xl bg-white/5 border border-white/5 hover:bg-white/10 transition-all hover:-translate-y-2"
                       >
-                        {/* 
-                          Note: In production, res.path should be a full URL.
-                          For local, we might need to proxy images from the backend.
-                        */}
-                        <div className="w-24 h-24 rounded-xl bg-slate-800 overflow-hidden flex-shrink-0 border-2 border-slate-700">
+                        <div className="aspect-square w-full rounded-2xl bg-slate-800 overflow-hidden border-2 border-slate-700 relative">
                           <img
-                            src={`http://localhost:8000/static/${res.path}`}
+                            src={`${API_BASE_URL}/static/${res.path}`}
                             alt="Result"
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                             onError={(e) => {
-                              // Fallback for local files if static serving is set
-                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150';
+                              (e.target as HTMLImageElement).src = `https://raw.githubusercontent.com/Almighty-Alpaca/CelebA-dataset/master/images/${res.path.split('/').pop()}`;
                             }}
                           />
-                        </div>
-                        <div className="flex flex-col justify-center gap-2 flex-grow">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Match Confidence</span>
-                            <span className="text-sm font-mono font-bold text-white">{(res.score * 100).toFixed(1)}%</span>
+                          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                            <span className="text-xs font-mono font-bold text-white">{(res.score * 100).toFixed(1)}%</span>
                           </div>
-                          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                        </div>
+                        <div className="flex flex-col gap-3">
+                          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                             <motion.div
                               initial={{ width: 0 }}
                               animate={{ width: `${res.score * 100}%` }}
-                              className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]"
                             />
                           </div>
-                          <p className="text-[10px] text-slate-500 mt-1 font-mono">{res.path.split('/').pop()}</p>
+                          <p className="text-[10px] text-slate-500 text-center font-mono truncate">{res.path.split('/').pop()}</p>
                         </div>
                       </motion.div>
                     ))}
@@ -243,7 +237,7 @@ export default function App() {
             <a href="#" className="hover:text-white transition-colors"><Terminal size={20} /></a>
             <a href="#" className="hover:text-white transition-colors"><Info size={20} /></a>
           </div>
-          <p className="text-sm">Built with Next.js, CLIP, and Qdrant</p>
+          <p className="text-sm">Built with CLIP and Qdrant</p>
           <div className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-700 flex items-center gap-2">
             Powered by <Zap size={10} /> SupportVectors
           </div>
