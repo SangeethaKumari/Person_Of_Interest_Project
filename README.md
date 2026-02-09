@@ -31,7 +31,7 @@ The project has been upgraded to a modern **Client-Server Architecture**, design
 3. **CRITICAL**: Because this app runs heavy AI models (CLIP-L, SigLIP), you **must** select a plan with at least **2GB-4GB of RAM** (Starter or Pro). The "Free" tier will crash.
 4. Set the **Root Directory** to `backend`.
 5. The build and start commands will be automatically detected if you use the provided `render.yaml` blueprint, or set them manually:
-   - Build Command: `pip install -r requirements.txt`
+   - Build Command: `pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install -r requirements.txt`
    - Start Command: `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`
 6. Add Environment Variables:
    - `QDRANT_URL`: Your Qdrant cluster URL.

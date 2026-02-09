@@ -2,7 +2,7 @@ services:
   - type: web
     name: poi-backend
     env: python
-    buildCommand: "cd backend && pip install -r requirements.txt"
+    buildCommand: "cd backend && pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install -r requirements.txt"
     startCommand: "cd backend && python -m uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION

@@ -855,9 +855,9 @@ tqdm==4.67.1 \
     #   huggingface-hub
     #   sentence-transformers
     #   transformers
-transformers==4.57.0 \
-    --hash=sha256:9d7c6d098c026e40d897e017ed1f481ab803cbac041021dbc6ae6100e4949b55 \
-    --hash=sha256:d045753f3d93f9216e693cdb168698dfd2e9d3aad1bb72579a5d60ebf1545a8b
+transformers==4.56.2 \
+    --hash=sha256:5e7c623e2d7494105c726dd10f6f90c2c99a55ebe86eef7233765abd0cb1c529 \
+    --hash=sha256:79c03d0e85b26cb573c109ff9eafa96f3c8d4febfd8a0774e8bba32702dd6dde
     # via
     #   backend
     #   sentence-transformers
