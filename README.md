@@ -1,45 +1,85 @@
-This project is a Person of Interest (POI) Image Search System designed to find specific people in a dataset (like CelebA) using natural language descriptions.
+# Person of Interest (POI) AI Search System 🌟
 
-🚀 Project Overview
-The system allows you to search through thousands of images by typing descriptions such as "a smiling woman with blonde hair and glasses" or "a man with a beard wearing a suit".
+An enterprise-grade, multi-model AI search engine for human faces. This project uses state-of-the-art vision-language models (CLIP and SigLIP 2) to enable semantic search through image datasets.
 
-Core Components:
-AI Engine (CLIP Model): It uses the clip-ViT-B-32 model. This is a powerful AI that understands both text and images. It converts images into mathematical "vectors" (embeddings) that represent their visual features.
-Vector Search: When you type a query, it converts your text into a vector and uses Cosine Similarity to find the images that "mathematically" look most like your description.
-Streamlit Frontend: A modern, premium web interface (
+## 🚀 Architecture for Deployment
 
-src/ad_poi.py
-) where you can see a gallery of celebrities and perform real-time searches.
-📂 Code Structure & File Functions
+The project has been upgraded to a modern **Client-Server Architecture**, designed for high scalability and cloud deployment:
 
-run_app.py
-: The main entry point. Run this to launch the Streamlit application.
+- **Frontend (React)**: Hosted on **Vercel**. A premium dark-themed UI built with Vite, Framer Motion, and Tailwind CSS.
+- **Backend (FastAPI)**: Hosted on **Render**. Provides high-performance AI inference endpoints.
+- **Vector DB (Qdrant)**: Hosted on **Qdrant Cloud**. Handles lightning-fast vector similarity searches.
+- **Storage**: Images can be served via CDN or hosted documentation.
 
-src/ad_poi.py
-: The core logic. It handles:
-Data Setup: Downloading images (currently set to HuggingFace's celebA).
-Embedding Generation: Scanning images and saving their "AI fingerprints" into the 
+---
 
-data/
- folder.
-Search UI: The interface with the search bar, gallery, and similarity scores.
+## 🛠️ Deployment Guide
 
-data/
-: Contains 
+### 1. Vector Database (Qdrant)
+1. Sign up for a free [Qdrant Cloud](https://cloud.qdrant.io/) account.
+2. Create a new Cluster and get your **URL** and **API Key**.
+3. Run the migration script locally to push your existing embeddings:
+   ```bash
+   export QDRANT_URL="your-cluster-url"
+   export QDRANT_API_KEY="your-api-key"
+   cd backend && uv run python migrate_to_qdrant.py
+   ```
 
-index_vectors.npy
- (the AI embeddings) and 
+### 2. Backend (Render)
+1. Connect your GitHub repository to [Render.com](https://render.com/).
+2. Create a new **Web Service**.
+3. Set the Build Command: `pip install -r requirements.txt` (or use the provided `pyproject.toml`).
+4. Set the Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`.
+5. Add Environment Variables:
+   - `QDRANT_URL`: Your Qdrant cluster URL.
+   - `QDRANT_API_KEY`: Your Qdrant API key.
 
-index_meta.parquet
- (the list of image paths).
-docs/images/celebA/: The folder where the individual celebrity images are stored.
-🛠️ How to Run with your CelebA Dataset
-Since you mentioned you will be adding the CelebA dataset, here is the workflow you should follow:
+### 3. Frontend (Vercel)
+1. Import your repository into [Vercel](https://vercel.com/).
+2. Set the Framework Preset to **Vite**.
+3. Set the Root Directory to `frontend`.
+4. Add Environment Variables:
+   - `VITE_API_URL`: The URL of your Render backend.
 
-Place your Images: Add your CelebA .jpg files into the docs/images/celebA/ directory.
-Reset the Index: If you add new images, you must delete the existing files in the data/ folder (index_vectors.npy and index_meta.parquet). This forces the AI to "re-learn" and index your new images.
-Run the Setup:
-uv run python src/ad_poi.py
-This will scan your new images and create the search index.
-Launch the App:
-python run_app.py
+---
+
+## 💻 Local Development
+
+### Prerequisites
+- Python 3.12+
+- Node.js 18+
+- `uv` (Fast Python package manager)
+
+### Start Backend
+```bash
+cd backend
+uv run uvicorn main:app --reload
+```
+
+### Start Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 🎭 Key Features
+- **Narrative Search**: Find people using natural language descriptions.
+- **Celebrity Doppelgänger**: Upload a photo to find your celebrity twin.
+- **Multi-Model Comparison**: Contrast results from CLIP-B, CLIP-L, and SigLIP 2.
+- **Glassmorphism UI**: A premium, responsive design with smooth animations.
+
+---
+
+## 📂 Code Structure
+- `/backend`: FastAPI server, AI model logic, and migration scripts.
+- `/frontend`: React application (Vite + Tailwind).
+- `/src`: Legacy Streamlit implementation and local processing scripts.
+- `/data`: Local vector embeddings and metadata.
+- `/docs/images/celebA`: Image dataset storage.
+
+---
+
+Built with ⚡ by **SupportVectors**

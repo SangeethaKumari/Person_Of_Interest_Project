@@ -32,3 +32,8 @@ include = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/Image_Search"]
 
+[tool.uv.workspace]
+members = [
+    "backend",
+]
+
