@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Upload, User, Zap, Github, Terminal, Info, Eye, Sparkles, History as HistoryIcon, X, Clock, BarChart3, Target, Rocket, Cpu } from 'lucide-react';
+import { Search, Upload, Zap, Terminal, Eye, Sparkles, History as HistoryIcon, X, Clock, Target, Rocket, Cpu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { clsx, type ClassValue } from 'clsx';
