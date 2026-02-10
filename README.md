@@ -85,4 +85,17 @@ npm run dev
 
 ---
 
+Base CLIP (Blue):
+
+Model ID: clip-ViT-B-32
+Role: A balanced, industry-standard model from OpenAI. It is optimized for speed and general keyword matching.
+Enhanced CLIP-L (Purple):
+
+Model ID: clip-ViT-L-14
+Role: A significantly larger version of CLIP. It has 303 Million parameters (compared to 86M in the base model), allowing it to see much finer facial details and textures, which is why it often gives you the "correct" results.
+SigLIP 2 (Emerald):
+
+Model ID: google/siglip2-base-patch16-224
+Role: Google's latest high-end "Vision-Language" model. I have manually refreshed your Cloud Database to use the official SigLIP 2 weights, ensuring the embeddings are now perfectly matched to the model's "brain."
+
 Built with ⚡ by **SupportVectors**
