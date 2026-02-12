@@ -4,10 +4,13 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from pathlib import Path
 import os
-from tqdm import tqdm
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables
+load_dotenv(find_dotenv())
 
 # Configuration
-QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"

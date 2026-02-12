@@ -99,3 +99,12 @@ Model ID: google/siglip2-base-patch16-224
 Role: Google's latest high-end "Vision-Language" model. I have manually refreshed your Cloud Database to use the official SigLIP 2 weights, ensuring the embeddings are now perfectly matched to the model's "brain."
 
 Built with ⚡ by **SupportVectors**
+
+
+
+A silhouette against a sunset
+
+A person walking through a market
+
+A celebrity with a very intense and focused gaze
+an expression of pure, contagious joy

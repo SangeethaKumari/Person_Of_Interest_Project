@@ -7,11 +7,14 @@ from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
-import os
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables
+load_dotenv(find_dotenv())
 
 # Configuration
-QDRANT_URL = "https://38970671-a23a-48a1-a38c-3b64d16c36da.us-east4-0.gcp.cloud.qdrant.io"
-QDRANT_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.wWsn8laZZvzOqBI6LMAeb070q1pf2mBzyxW4cM3Wp90"
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 MODEL_ID = "google/siglip2-base-patch16-224"
 IMG_DIR = Path("docs/images/celebA")
 META_PATH = Path("data/index_meta.parquet")

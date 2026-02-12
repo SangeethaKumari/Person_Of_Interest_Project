@@ -10,6 +10,10 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from qdrant_client import QdrantClient
 from better_profanity import profanity
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables
+load_dotenv(find_dotenv())
 
 # Optimization: Use CPU for local and limit threads
 torch.set_num_threads(1)
@@ -94,6 +98,8 @@ async def startup_event():
             print("📡 Connected to Qdrant Cloud")
         except Exception as e:
             print(f"⚠️ Qdrant Error: {e}")
+    else:
+        print("⚠️ QDRANT_URL not found in environment variables. Database not connected.")
 
     # 2. Load Models Locally
     for key, config in MODELS_CONFIG.items():

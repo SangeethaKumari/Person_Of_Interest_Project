@@ -39,7 +39,9 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ModelResults | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'text' | 'image'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'camera'>('text');
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -101,6 +103,55 @@ export default function App() {
       alert('Upload failed');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const startCamera = async () => {
+    setActiveTab('camera');
+    setPreviewImage(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      alert("Camera access denied");
+    }
+  };
+
+  const captureImage = () => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext('2d');
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+
+        canvasRef.current.toBlob(async (blob) => {
+          if (blob) {
+            const file = new File([blob], "camera_capture.jpg", { type: "image/jpeg" });
+            setPreviewImage(URL.createObjectURL(file));
+
+            // Stop the camera stream
+            const stream = videoRef.current?.srcObject as MediaStream;
+            stream?.getTracks().forEach(track => track.stop());
+
+            setLoading(true);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+              const response = await axios.post(`${API_BASE_URL}/search/image?model_type=all`, formData);
+              setResults(response.data);
+              addToHistory('image', 'Live Camera Scan');
+            } catch (err) {
+              alert('Analysis failed');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }, 'image/jpeg');
+      }
     }
   };
 
@@ -195,6 +246,12 @@ export default function App() {
             >
               Identity Upload
             </button>
+            <button
+              onClick={startCamera}
+              className={cn("px-8 py-3 rounded-2xl font-black tracking-tighter transition-all uppercase text-xs", activeTab === 'camera' ? "bg-emerald-600 text-white shadow-xl shadow-emerald-600/20" : "bg-slate-800/40 text-slate-500 hover:text-slate-300")}
+            >
+              Live Scan
+            </button>
           </div>
 
           <div className="glass-morphism p-4 rounded-[40px] border border-white/5 relative">
@@ -211,7 +268,7 @@ export default function App() {
                   {loading ? <Zap className="animate-spin text-white" /> : <Search size={28} className="text-white" />}
                 </button>
               </form>
-            ) : (
+            ) : activeTab === 'image' ? (
               <label className="flex items-center justify-center py-6 px-10 gap-6 cursor-pointer group">
                 <input type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
                 <div className="size-20 rounded-[30px] bg-purple-600 flex items-center justify-center group-hover:bg-purple-500 shadow-xl shadow-purple-600/30 transition-all">
@@ -221,6 +278,26 @@ export default function App() {
                   {previewImage ? "Scanning Identity..." : "Drop target image for triple lookup"}
                 </div>
               </label>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-4">
+                {!previewImage ? (
+                  <>
+                    <div className="relative w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden bg-black border-2 border-slate-700">
+                      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 border-[3px] border-emerald-500/50 rounded-3xl pointer-events-none" />
+                    </div>
+                    <button onClick={captureImage} className="px-8 py-3 rounded-full bg-emerald-600 text-white font-bold flex items-center gap-2 hover:bg-emerald-500 transition-all">
+                      <div className="size-4 bg-white rounded-full animate-pulse" /> Capture Identity
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="text-emerald-400 font-mono uppercase tracking-widest animate-pulse">Analyzing Biometrics...</div>
+                    <button onClick={() => { setPreviewImage(null); startCamera(); }} className="text-sm text-slate-500 underline hover:text-white">Retake Scan</button>
+                  </div>
+                )}
+                <canvas ref={canvasRef} className="hidden" />
+              </div>
             )}
           </div>
           {error && <div className="text-center text-red-400 font-mono text-xs uppercase tracking-widest">{error}</div>}

@@ -13,4 +13,5 @@ dependencies = [
     "uvicorn>=0.40.0",
     "better-profanity>=0.7.0",
     "sentence-transformers[onnx]>=3.0.0",
+    "python-dotenv>=1.0.1",
 ]
