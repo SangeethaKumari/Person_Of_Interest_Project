@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 from qdrant_client import QdrantClient
 from better_profanity import profanity
+from diffusers import AutoPipelineForImage2Image
 from dotenv import load_dotenv, find_dotenv
 
 # Load environment variables
@@ -86,6 +87,7 @@ MODELS_CONFIG = {
 # Global clients/models
 qdrant_client = None
 models = {}
+refinement_pipe = None
 
 @app.on_event("startup")
 async def startup_event():
@@ -112,6 +114,20 @@ async def startup_event():
             print(f"✅ {config['name']} Loaded")
         except Exception as e:
             print(f"❌ Error loading {key}: {e}")
+
+    # 3. Load Local Refinement Model (SDXL Turbo)
+    try:
+        global refinement_pipe
+        print("📥 Loading SDXL Turbo for local refinement...")
+        refinement_pipe = AutoPipelineForImage2Image.from_pretrained(
+            "stabilityai/sdxl-turbo",
+            torch_dtype=torch.float16,
+            variant="fp16"
+        )
+        refinement_pipe.to("mps")
+        print("✅ SDXL Turbo Loaded on MPS")
+    except Exception as e:
+        print(f"⚠️ SDXL Turbo Load Error: {e} (Refinement will be disabled)")
 
 # Mount static files
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -201,4 +217,46 @@ async def search_image(file: UploadFile = File(...), model_type: str = "base_cli
     
     if model_type == "all":
         return res
-    return {"results": res.get(model_type if model_type in res else "base_clip", [])}
+@app.post("/search/refine")
+async def refine_image(image_path: str, prompt: str):
+    """
+    Step 2: Refinement. Takes a retrieved image and uses Local SDXL Turbo
+    to regenerate the face based on feedback.
+    """
+    import base64
+    from io import BytesIO
+    
+    if refinement_pipe is None:
+        raise HTTPException(status_code=503, detail="Generative Engine not loaded locally")
+
+    try:
+        # 1. Load the original image from local disk
+        full_path = PROJECT_ROOT / image_path
+        if not full_path.exists():
+             raise HTTPException(status_code=404, detail="Original image not found")
+             
+        init_image = Image.open(full_path).convert("RGB").resize((512, 512))
+
+        # 2. Local Generative Inference
+        # SDXL Turbo is fast (1-4 steps) and needs no guidance_scale
+        generated_image = refinement_pipe(
+            prompt, 
+            image=init_image, 
+            strength=0.5, 
+            guidance_scale=0.0, 
+            num_inference_steps=2
+        ).images[0]
+        
+        # 3. Convert to Base64
+        buffered = BytesIO()
+        generated_image.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+        return {
+            "refined_image": img_str,
+            "status": "success",
+            "message": f"POI Refined Locally: {prompt}"
+        }
+    except Exception as e:
+        print(f"Error in Refinement: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

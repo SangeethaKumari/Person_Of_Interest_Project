@@ -16,6 +16,7 @@ interface SearchResult {
   path: string;
   score: number;
   raw_score: number;
+  refined_image?: string;
 }
 
 interface ModelResults {
@@ -152,6 +153,24 @@ export default function App() {
           }
         }, 'image/jpeg');
       }
+    }
+  };
+
+  const handleRefineAction = async (imagePath: string, prompt: string, modelId: string, itemIndex: number) => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_BASE_URL}/search/refine`, {}, {
+        params: { image_path: imagePath, prompt: prompt }
+      });
+      if (results) {
+        const newResults = { ...results };
+        newResults[modelId][itemIndex].refined_image = response.data.refined_image;
+        setResults(newResults);
+      }
+    } catch (err) {
+      alert("Refinement engine busy or offline.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -322,9 +341,13 @@ export default function App() {
                         <motion.div key={res.path + model.id} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} className="group p-4 rounded-[32px] bg-slate-900/40 border border-white/[0.03] hover:border-blue-500/30 transition-all">
                           <div className="aspect-square rounded-[24px] overflow-hidden relative border border-white/[0.05] shadow-2xl">
                             <img
-                              src={`${API_BASE_URL}/static/${res.path}`}
+                              src={res.refined_image ? `data:image/jpeg;base64,${res.refined_image}` : `${API_BASE_URL}/static/${res.path}`}
                               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                              onError={(e) => { (e.target as HTMLImageElement).src = `https://raw.githubusercontent.com/Almighty-Alpaca/CelebA-dataset/master/images/${res.path.split('/').pop()}`; }}
+                              onError={(e) => {
+                                if (!res.refined_image) {
+                                  (e.target as HTMLImageElement).src = `https://raw.githubusercontent.com/Almighty-Alpaca/CelebA-dataset/master/images/${res.path.split('/').pop()}`;
+                                }
+                              }}
                             />
                             <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
                               <span className="text-xs font-black text-white italic">{(res.score * 100).toFixed(1)}%</span>
@@ -334,9 +357,37 @@ export default function App() {
                             <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
                               <motion.div initial={{ width: 0 }} animate={{ width: `${res.score * 100}%` }} className={cn("h-full rounded-full transition-all duration-1000", model.color.replace('text', 'bg'))} />
                             </div>
-                            <div className="mt-3 flex items-center justify-between text-[10px] font-mono text-slate-600 tracking-tighter">
-                              <span>SIGNATURE</span>
-                              <span>{res.path.split('/').pop()}</span>
+
+                            {/* Refinement UI */}
+                            <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  id={`refine-${model.id}-${i}`}
+                                  placeholder="Refine face..."
+                                  className="flex-1 bg-slate-950/50 border border-white/5 rounded-xl px-3 py-2 text-[10px] focus:outline-none focus:border-blue-500/50 transition-all font-mono"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const val = e.currentTarget.value;
+                                      if (val) handleRefineAction(res.path, val, model.id, i);
+                                    }
+                                  }}
+                                />
+                                <button
+                                  onClick={() => {
+                                    const el = document.getElementById(`refine-${model.id}-${i}`) as HTMLInputElement;
+                                    if (el.value) handleRefineAction(res.path, el.value, model.id, i);
+                                  }}
+                                  disabled={loading}
+                                  className="bg-blue-600 hover:bg-blue-500 p-2 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                                >
+                                  {loading ? <Sparkles size={14} className="animate-spin text-white" /> : <Sparkles size={14} className="text-white" />}
+                                </button>
+                              </div>
+                              <div className="flex items-center justify-between text-[8px] font-bold text-slate-700 uppercase tracking-widest">
+                                <span>{res.path.split('/').pop()}</span>
+                                <span className="text-blue-500/50">ITERATIVE REFINE</span>
+                              </div>
                             </div>
                           </div>
                         </motion.div>
